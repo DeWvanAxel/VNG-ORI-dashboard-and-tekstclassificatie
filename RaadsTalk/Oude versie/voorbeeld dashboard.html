@@ -1,0 +1,824 @@
+<!doctype html>
+<html>
+    <head>
+        <meta charset="UTF-8" />
+        <title>VNG Dashboard</title>
+        <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.3.1/jquery.min.js"></script>
+        <script language="javascript" src="lz-string-master/lz-string-master/libs/lz-string.js"></script>
+        <link rel="icon" href="http://smartcity.nl/wp-content/uploads/2018/02/logo-VNG-Realisatie.jpg">
+        <link rel="stylesheet" type="text/css" href="dashboardStyle.css">
+
+    </head>
+
+    <body>
+    	<div class="topnav">
+		  <a class="active" href="#home">Raadspraat</a>
+		  <a id="button" href="#about">Over de visualisaties</a>
+		</div>
+        
+	    
+	    <div id="wrapper">
+	    	<div id="questions">
+		    	Gemeente:<br>
+			    <input type="text" value="combined_index" id="gemeente1"><br><br>
+			    Term: <br>
+			    <input type="text" value="VNG" id="query"><br><br>
+			    Start datum:<br>
+			    <input type="text" value="2017-01-01" id="start_date"><br><br>
+			    Eind datum:<br>
+			    <input type="text" value="2018-11-01" id="end_date"><br><br>
+			    <input type="button" id="klikhiermannetje" value="zoek op">
+			</div>
+	    	<div class="linechart" id="chart1"></div>
+			<div class="container" id="chart2"></div>
+		</div>
+		<div id="chart3"></div>
+
+		<!-- The Modal -->
+		<div id="myModal" class="modal">
+
+		  <!-- Modal content -->
+		  <div class="modal-content">
+		    <div class="modal-header">
+		      <span class="close">&times;</span>
+		      <h2>Over de visualisaties</h2>
+		    </div>
+		    <div class="modal-body">
+		      <p>Integer molestie hendrerit leo, eu finibus enim laoreet a. Pellentesque accumsan tortor sed est aliquam, in luctus erat pulvinar. Etiam venenatis volutpat nunc, consectetur feugiat magna varius sit amet. Donec pulvinar dolor vel ligula tincidunt, eu suscipit mauris pulvinar. Pellentesque a feugiat dolor. Donec nisi ligula, imperdiet nec est eu, semper venenatis turpis. Phasellus luctus leo at mi ultricies facilisis. Donec fermentum mauris a purus posuere blandit. Nulla orci tortor, tempus dignissim commodo sit amet, fermentum quis augue. Curabitur tincidunt a enim quis venenatis. Lorem ipsum dolor sit amet, consectetur adipiscing elit. Pellentesque augue dui, imperdiet quis imperdiet vel, varius in ligula. Aenean pretium porta facilisis. </p>
+		      <p>Some other text...</p>
+		    </div>
+		    <div class="modal-footer">
+		      <p>VNG Realisatie</p>
+		    </div>
+		  </div>
+
+		</div>
+
+
+       
+        <script src="https://d3js.org/d3.v3.min.js"></script>
+<!--         <script src="https://d3js.org/d3.v4.min.js"></script>
+ -->
+        <script type="text/javascript">
+			var modal = document.getElementById('myModal');
+
+			// Get the button that opens the modal
+			var btn = document.getElementById("button");
+
+			// Get the <span> element that closes the modal
+			var span = document.getElementsByClassName("close")[0];
+
+			// When the user clicks the button, open the modal 
+			btn.onclick = function() {
+			    modal.style.display = "block";
+			}
+
+			// When the user clicks on <span> (x), close the modal
+			span.onclick = function() {
+			    modal.style.display = "none";
+			}
+
+			// When the user clicks anywhere outside of the modal, close it
+			window.onclick = function(event) {
+			    if (event.target == modal) {
+			        modal.style.display = "none";
+			    }
+			}
+			// };
+
+
+            var Values
+            var lineAndDots
+
+
+            // set the dimensions and margins of the graph
+            var margin = {top: 40, right: 20, bottom: 30, left: 50},
+                width = 1000 - margin.left - margin.right,
+                height = 400 - margin.top - margin.bottom;
+
+            // parse the date / time
+            var formatDate = d3.time.format("%Y-%m-%d");
+
+            // set the ranges
+            var x = d3.time.scale().range([0, width]);
+            var y = d3.scale.linear().range([height, 0]);
+
+            // Define the axes
+			var xAxis = d3.svg.axis().scale(x)
+			    .ticks(12);
+
+			var yAxis = d3.svg.axis().scale(y)
+				.orient("left")
+			    .ticks(5);
+
+            // define the line
+            var valueline = d3.svg.line()
+                .x(function(d) { return x(d.x); })
+                .y(function(d) { return y(d.y); });
+
+            // append the svg obgect to the body of the page
+            // appends a 'group' element to 'svg'
+            // moves the 'group' element to the top left margin
+            var canvasline = d3.select("#chart1").append("svg")
+                .attr("width", width + margin.left + margin.right)
+                .attr("height", height + margin.top + margin.bottom)
+                .append("g")
+                .attr("transform",
+                      "translate(" + margin.left + "," + margin.top + ")");
+
+            var tooltip1 = d3.select("#chart1").append("div")	
+			    .attr("class", "tooltip")				
+			    .style("opacity", 0);
+
+            Values = Array();
+            counter = 0;
+
+            getAmount($("#gemeente1").val(), $("#query").val(), $("#start_date").val(), $("#end_date").val(),"eerste")
+
+
+            function getAmount(gemeente, query, start_date, end_date, intention) {
+                counter = 0;
+                
+                start_year = parseInt(start_date.slice(0,4))
+                start_month = parseInt(start_date.slice(5,7))
+                end_year = parseInt(end_date.slice(0,4))
+                end_month = parseInt(end_date.slice(5,7))
+
+                datesLow = Array()
+                datesHigh = Array()
+                while(start_year<end_year||start_month<end_month){
+                	if(start_month<10){
+                		datesLow.push(String(start_year) + "-0" + String(start_month) + "-01")
+                		if(start_month == 1 || start_month == 3 || start_month == 5 || start_month == 7 || start_month == 8){
+                			datesHigh.push(String(start_year) + "-0" + String(start_month) + "-31")
+                		} else if(start_month == 4 || start_month == 6 || start_month == 8){
+                			datesHigh.push(String(start_year) + "-0" + String(start_month) + "-30")
+                		} else if (start_year % 4 == 0) {
+                			datesHigh.push(String(start_year) + "-0" + String(start_month) + "-29")
+                		} else{
+                			datesHigh.push(String(start_year) + "-0" + String(start_month) + "-28")
+                		}
+                	}else{
+                		datesLow.push(String(start_year) + "-" + String(start_month) + "-01")
+                		if(start_month == 10 || start_month == 12){
+                			datesHigh.push(String(start_year) + "-" + String(start_month) + "-31")
+                		} else {
+                			datesHigh.push(String(start_year) + "-" + String(start_month) + "-30")
+                		}
+                	}
+
+                	start_month += 1
+                	if (start_month > 12){
+                		start_month = 1
+                		start_year += 1
+                	}
+                }
+            	
+
+ 
+	            Values = Array();
+                // datesLow = Array("2017-01-01","2017-02-01","2017-03-01","2017-04-01","2017-05-01","2017-06-01","2017-07-01","2017-08-01","2017-09-01","2017-10-01","2017-11-01","2017-12-01");
+                // datesHigh = Array("2017-01-31","2017-02-28","2017-03-31","2017-04-30","2017-05-31","2017-06-30","2017-07-31","2017-08-31","2017-09-30","2017-10-31","2017-11-30","2017-12-31");
+
+                for (var i = 0; i < datesLow.length; i++) {
+                	getOneMonth(gemeente, query, datesLow[i], datesHigh[i], i, datesLow.length, intention);
+                }    
+            }
+
+            function getOneMonth(gemeente, query, dateLow, dateHigh, valueIndex, length, intention){
+            	$.post('http://api.openraadsinformatie.nl/v0/'+gemeente+'/events/search', 
+            		'{"query":"\\"'+query+'\\"","filters":{"start_date":{"from": "'+dateLow+'","to":"'+dateHigh+'"}}}')
+            	.done(function(data){
+            			Values[valueIndex] = {x: dateLow,y:data.meta.total} ;
+            			counter ++;
+            			if(counter == length){
+            				if(gemeente == "combined_index"){
+            					gemeente = "alle gemeentes"
+            				}
+            				if(intention == "eerste"){
+            					
+            					Values.forEach(function(d) {
+								  d.date = d.x
+								  d.x = formatDate.parse(d.x);;
+								  d.y = d.y;
+								});
+
+								// Scale the range of the data
+								x.domain(d3.extent(Values, function(d) { return d.x; }));
+								y.domain([0, d3.max(Values, function(d) { return d.y; })]);
+
+								// Add the valueline path.
+								canvasline.append("path")
+								  .data([Values])
+								  .attr("class", "line")
+								  .attr("stroke", "#00bfff")
+								  .attr("stroke-width", 2)
+								  .attr("fill", "none")
+								  .attr("d", valueline);
+
+								// Data dots
+								lineAndDots = canvasline.append("g")
+									.attr("class", "line-and-dots")
+								    //.attr("transform", "translate(" + ((margin.left + margin.right) / 2) + "," + 0 + ")")		
+
+								lineAndDots.selectAll("circle")
+									.data(Values)
+									.enter()
+									.append("circle")
+									.attr("class", "data-circle")
+									.attr("r", 5)
+									.attr("fill", "#00bfff")
+									.attr("cx", function(d) { return x(d.x); })
+									.attr("cy", function(d) { return y(d.y); })
+									.on("mouseover", function(d) {		
+								        tooltip1.transition()		
+								            .duration(200)		
+								            .style("opacity", .9);	
+								        tooltip1.html( function(e) { 	if(d.date.slice(5,7) == "01"){return "januari "+d.date.slice(0,4) +"<br/>" + d.y}
+								        								else if(d.date.slice(5,7) == "02"){return "februari "+d.date.slice(0,4) + "<br/>" + d.y }
+								        								else if(d.date.slice(5,7) == "03"){return "maart "+d.date.slice(0,4) + "<br/>" + d.y}
+								        								else if(d.date.slice(5,7) == "04"){return "april "+d.date.slice(0,4) + " <br/>" + d.y }
+								        								else if(d.date.slice(5,7) == "05"){return "mei "+d.date.slice(0,4) + "<br/>" + d.y}
+								        								else if(d.date.slice(5,7) == "06"){return "juni "+d.date.slice(0,4) + "<br/>" + d.y }
+								        								else if(d.date.slice(5,7) == "07"){return "juli "+d.date.slice(0,4) + " <br/>" + d.y}
+								        								else if(d.date.slice(5,7) == "08"){return "augustus "+d.date.slice(0,4) + " <br/>" + d.y }
+								        								else if(d.date.slice(5,7) == "09"){return "september "+d.date.slice(0,4) + " <br/>" + d.y}
+								        								else if(d.date.slice(5,7) == "10"){return "oktober "+d.date.slice(0,4) + " <br/>" + d.y }
+								        								else if(d.date.slice(5,7) == "11"){return "november "+d.date.slice(0,4) + "<br/>" + d.y}
+								        								else{return "december "+d.date.slice(0,4) + " <br/>" + d.y}}
+								        	)	
+								            .style("left", (d3.event.pageX) + "px")		
+								            .style("top", (d3.event.pageY - 28) + "px");	
+								        })					
+								    .on("mouseout", function(d) {		
+								        tooltip1.transition()		
+								            .duration(500)		.style("opacity", 0);	
+								    });
+
+								// Add the X Axis
+								canvasline.append("g")
+								  .attr("class", "x axis")
+								  .attr("transform", "translate(0," + height + ")")
+								  .call(xAxis);
+
+								// Add the Y Axis
+								canvasline.append("g")
+								  .attr("class", "y axis")
+								  .call(yAxis);
+
+								canvasline.append("text")
+									.attr("class", "title")
+							        .attr("x", (width / 2))             
+							        .attr("y", 0 - (margin.top / 2))
+							        .attr("text-anchor", "middle")  
+							        .style("font-size", "16px") 
+							        .style("text-decoration", "underline")  
+							        .text("Lijngrafiek: Het voorkomen van de term '" +query+ "' in stukken van "+gemeente+ "");
+
+            				}
+            				else{
+								Values.forEach(function(d) {
+								  d.date = d.x
+								  d.x = formatDate.parse(d.x);
+								  d.y = d.y;
+								});
+
+								// var canvasline = d3.select("body");
+								// Scale the range of the data
+								
+								x.domain(d3.extent(Values, function(d) { return d.x; }));
+								y.domain([0, d3.max(Values, function(d) { return d.y; })]);
+
+							    canvasline.select("g.x.axis") // change the x axis
+						            .transition().duration(750)
+						            .call(xAxis);
+
+						        canvasline.select("g.y.axis") // change the y axis
+						            .transition().duration(750)
+						            .call(yAxis);
+
+							    // Select the section we want to apply our changes to
+							    
+
+							    // Make the changes
+						        canvasline.select(".line")   // change the line
+						            .transition()
+						            .duration(750)
+						            .attr("d", valueline(Values));
+
+						        canvasline.select("g.line-and-dots").selectAll("circle")
+						        	.remove();
+
+						        lineAndDots.selectAll("circle")
+									.data(Values)
+									.enter()	
+									.append("circle")
+									.attr("class", "data-circle")
+									.attr("r", 5)
+									.attr("fill", "#00bfff")
+									.attr("cx", function(d) { return x(d.x); })
+									.attr("cy", function(d) { return y(d.y); })
+									.on("mouseover", function(d) {		
+								        tooltip1.transition()		
+								            .duration(200)		
+								            .style("opacity", .9);	
+								        tooltip1.html( function(e) { 	if(d.date.slice(5,7) == "01"){return "januari "+d.date.slice(0,4) +"<br/>" + d.y}
+								        								else if(d.date.slice(5,7) == "02"){return "februari "+d.date.slice(0,4) + "<br/>" + d.y }
+								        								else if(d.date.slice(5,7) == "03"){return "maart "+d.date.slice(0,4) + "<br/>" + d.y}
+								        								else if(d.date.slice(5,7) == "04"){return "april "+d.date.slice(0,4) + " <br/>" + d.y }
+								        								else if(d.date.slice(5,7) == "05"){return "mei "+d.date.slice(0,4) + "<br/>" + d.y}
+								        								else if(d.date.slice(5,7) == "06"){return "juni "+d.date.slice(0,4) + "<br/>" + d.y }
+								        								else if(d.date.slice(5,7) == "07"){return "juli "+d.date.slice(0,4) + " <br/>" + d.y}
+								        								else if(d.date.slice(5,7) == "08"){return "augustus "+d.date.slice(0,4) + " <br/>" + d.y }
+								        								else if(d.date.slice(5,7) == "09"){return "september "+d.date.slice(0,4) + " <br/>" + d.y}
+								        								else if(d.date.slice(5,7) == "10"){return "oktober "+d.date.slice(0,4) + " <br/>" + d.y }
+								        								else if(d.date.slice(5,7) == "11"){return "november "+d.date.slice(0,4) + "<br/>" + d.y}
+								        								else{return "december "+d.date.slice(0,4) + " <br/>" + d.y}}
+								        	)	
+								            .style("left", (d3.event.pageX) + "px")		
+								            .style("top", (d3.event.pageY - 28) + "px");	
+								        })					
+								    .on("mouseout", function(d) {		
+								        tooltip1.transition()		
+								            .duration(500)		.style("opacity", 0);	
+								    });
+
+								canvasline.select(".title").transition().text("Lijngrafiek: Het voorkomen van de term '" +query+ "' in stukken van "+gemeente+ "");
+				            }
+            			}
+            		});
+            	}
+
+			function updateData(gemeente, query, start_date, end_date) {
+				Values = Array()
+				getAmount(gemeente, query, start_date, end_date,"update")
+			    // 
+		};
+
+			
+			
+
+			
+
+   $("#klikhiermannetje").click(function(){updateData($("#gemeente1").val(), $("#query").val(), $("#start_date").val(), $("#end_date").val());});
+
+var widthPie = 600;
+var heightPie = 450;
+var radius = Math.min(widthPie, heightPie) / 2;
+
+var color = d3.scale.category20();
+
+var pie = d3.layout.pie()
+    .value(function(d) { return d.value; })
+    .sort(null);
+
+var arc = d3.svg.arc()
+    .innerRadius(radius - 100)
+    .outerRadius(radius - 20);
+
+var piesvg = d3.select("#chart2").append("svg")
+    .attr("width", widthPie)
+    .attr("height", heightPie)
+	.append("g")
+    .attr("transform", "translate(" + widthPie / 2 + "," + heightPie / 2 + ")");
+
+var tooltip2 = d3.select('#chart2')                               // NEW
+  .append('div')                                                // NEW
+  .attr('class', 'tooltip2')
+  .style("opacity", 0);                                    // NEW
+
+var legendRectSize = radius * 0.05;
+var legendSpacing = radius * 0.02;
+
+d3.csv("realdashboarddata.csv", function(data) {
+    D= Array(
+    		{term:"onderwijs", value:d3.sum(data, function(d){return parseFloat(d["onderwijs"]);})},
+    		{term:"bestuur", value:d3.sum(data, function(d){return parseFloat(d["bestuur en beleid"]);})},
+    		{term:"economie", value:d3.sum(data, function(d){return parseFloat(d["economische ontwikkeling"]);})},
+    		{term:"sociaaldomein", value:d3.sum(data, function(d){return parseFloat(d["sociaal domein"]);})},
+    		{term:"cultuur", value:d3.sum(data, function(d){return parseFloat(d["sport en cultuur"]);})},
+    		{term:"veiligheid", value:d3.sum(data, function(d){return parseFloat(d["veiligheid"]);})},
+    		{term:"wonen", value:d3.sum(data, function(d){return parseFloat(d["volkshuisvesting en ruimtelijke ordening"]);})},
+    		{term:"verkeer", value:d3.sum(data, function(d){return parseFloat(d["verkeer"]);})},
+    		{term:"volksgezondheid", value:d3.sum(data, function(d){return parseFloat(d["volksgezondheid"]);})},
+    	)
+    
+    var path = piesvg.datum(D).selectAll("path")
+		.data(pie)
+		.enter().append("path")
+		.attr("fill", function(d, i) { return color(i); })
+		.attr("d", arc);
+
+	path.on('mouseover', function(d) {                            // NEW
+	    var total = d3.sum(D.map(function(d) {                // NEW
+	    	return d.value;                                           // NEW
+	    }));  
+	    var percent = Math.round(1000 * d.data.value / total) / 10; // NEW
+	    tooltip2.transition()		
+            .duration(200)		
+            .style("opacity", .9);
+
+	    tooltip2.html("Thema: " + d.data.term +"<br/>Hoeveelheid: "+d.data.value+"<br/>Percentage: "+percent)
+	    	.style("left", (d3.event.pageX) + "px")	
+	    	.style("top", (d3.event.pageY - 28) + "px");
+	    // tooltip2.select('.label').html(d.term);                // NEW
+	    // tooltip2.select('.count').html(d.value);                // NEW
+	    tooltip2.style('display', 'block');                          // NEW
+	});                                                           // NEW
+	  
+	path.on('mouseout', function() {                              // NEW
+		tooltip2.transition()		
+            .duration(500)		
+            .style("opacity", 0);                           // NEW
+	});     
+
+	var legend = piesvg.selectAll('.legend')
+        .data(color.domain())
+        .enter()
+        .append('g')
+        .attr('class', 'legend')
+        .attr('transform', function(d, i) {
+            var height = legendRectSize + legendSpacing;
+            var offset =  height * color.domain().length / 2;
+            var horz = -3 * legendRectSize;
+            var vert = i * height - offset;
+            return 'translate(' + horz + ',' + vert + ')';
+        });
+
+    legend.append('rect')
+        .attr('width', legendRectSize)
+        .attr('height', legendRectSize)
+        .style('fill', color)
+        .style('stroke', color);
+
+    legend.append('text')
+        .attr('x', legendRectSize + legendSpacing)
+        .attr('y', legendRectSize - legendSpacing)
+        .text(function(d) {return D[d].term; });
+    var gemeente = $("#gemeente1").val()
+    if(gemeente == "combined_index"){
+    	gemeente = "alle gemeentes"
+    }
+    piesvg.append("text")
+		.attr("class", "title")
+        .attr("x", 0)             
+        .attr("y", -205)
+        .attr("text-anchor", "middle")  
+        .style("font-size", "16px") 
+        .style("text-decoration", "underline")  
+        .text("Taartdiagram: De thema-verdeling van alle stukken uit " + gemeente + "."); 
+
+    function createPie(gemeente,update){
+    	if(gemeente != "combined_index"){
+    		D= Array(
+	    		{term:"onderwijs", value:d3.sum(data, function(d){if(gemeente == d["gemeente"]){return parseFloat(d["onderwijs"])};})},
+	    		{term:"bestuur", value:d3.sum(data, function(d){if(gemeente == d["gemeente"]){return parseFloat(d["bestuur en beleid"])}})},
+	    		{term:"economie", value:d3.sum(data, function(d){if(gemeente == d["gemeente"]){return parseFloat(d["economische ontwikkeling"])};})},
+	    		{term:"sociaaldomein", value:d3.sum(data, function(d){if(gemeente == d["gemeente"]){return parseFloat(d["sociaal domein"])};})},
+	    		{term:"cultuur", value:d3.sum(data, function(d){if(gemeente == d["gemeente"]){return parseFloat(d["sport en cultuur"])};})},
+	    		{term:"veiligheid", value:d3.sum(data, function(d){if(gemeente == d["gemeente"]){return parseFloat(d["veiligheid"])};})},
+	    		{term:"wonen", value:d3.sum(data, function(d){if(gemeente == d["gemeente"]){return parseFloat(d["volkshuisvesting en ruimtelijke ordening"])};})},
+	    		{term:"verkeer", value:d3.sum(data, function(d){if(gemeente == d["gemeente"]){return parseFloat(d["verkeer"])};})},
+	    		{term:"volksgezondheid", value:d3.sum(data, function(d){if(gemeente == d["gemeente"]){return parseFloat(d["volksgezondheid"])};})},
+    		)
+    	}else{
+    		gemeente = "alle gemeentes"
+    		D= Array(
+	    		{term:"onderwijs", value:d3.sum(data, function(d){return parseFloat(d["onderwijs"]);})},
+	    		{term:"bestuur", value:d3.sum(data, function(d){return parseFloat(d["bestuur en beleid"]);})},
+	    		{term:"economie", value:d3.sum(data, function(d){return parseFloat(d["economische ontwikkeling"]);})},
+	    		{term:"sociaaldomein", value:d3.sum(data, function(d){return parseFloat(d["sociaal domein"]);})},
+	    		{term:"cultuur", value:d3.sum(data, function(d){return parseFloat(d["sport en cultuur"]);})},
+	    		{term:"veiligheid", value:d3.sum(data, function(d){return parseFloat(d["veiligheid"]);})},
+	    		{term:"wonen", value:d3.sum(data, function(d){return parseFloat(d["volkshuisvesting en ruimtelijke ordening"]);})},
+	    		{term:"verkeer", value:d3.sum(data, function(d){return parseFloat(d["verkeer"]);})},
+	    		{term:"volksgezondheid", value:d3.sum(data, function(d){return parseFloat(d["volksgezondheid"]);})},
+	    	)
+    	}
+    	
+    	path = path.data(pie(D)); // compute the new angles
+    	path.transition().duration(750).attr("d", arc); // redraw the arcs
+    	piesvg.select(".title").transition().text("Taartdiagram: De thema-verdeling van alle stukken uit " + gemeente + ".");
+    }
+
+    $("#klikhiermannetje").click(function(){createPie($("#gemeente1").val(),"update");})
+})
+
+// var queries = Array("snelweg","voetbal","wmo","pgb","sociaal domein","monumenten","basisschool","archiefwet","apv","duurzaam","zonnepanelen","kinderopvang","brandweer","crisis","financien","begroting","vng","facebook","ict","digitalisering","verkiezingen",
+//         "hondenbelasting","waarstaatjegemeente","marktgelden");
+// var queries = Array("woonbeleid","bereikbaarheid","schuldhulpverlening","lokale democratie","informatiesamenleving","ondermijning","energie","klimaat","cannabis","integratie nieuwkomers","statushouders","samen organiseren","gezondheidsbeleid","individueel keuzebudget","verward gedrag", "common ground", "ggi");
+// var queries = Array("Algemene Verordening Gegevensbescherming","Cannabis","Common Ground","Digitalisering","Energietransitie", "Energiebesparing","Gemeentelijke Gemeenschappelijke Infrastructuur","Informatiesamenleving","Informatieveiligheid", "Klantreizen" ,"Klimaat","Omgevingswet", "Privacy","Sterke lokale democratie","Transformatie sociaal domein", "Schuldhulpverlening", "VNG Realisatie","VNG");
+
+
+// var N = 10;
+// var w = 1500;
+// var h = 400;
+// var marginBar = {
+//   top: 45,
+//   bottom: 150,
+//   left: 100,
+//   right: 10
+// };
+// var widthBar = w - marginBar.left - marginBar.right;
+// var heightBar = h - marginBar.top - marginBar.bottom;
+
+// var test 
+// getAmountBar($("#gemeente1").val(), $("#query").val(),$("#start_date").val(), $("#end_date").val(), "eerste")
+
+
+// var controls = d3.select("#chart3")
+//   .append("div") 
+//   .attr("id", "control");
+
+// var sort_btn = controls.append("button")
+//   .attr("state", 0)
+//   .html("Sorteer oplopend"); 
+
+// var chartGroup = d3.select("#chart3")
+//   .append("svg")
+//   .attr("id", "chart")
+//   .attr("height", h)
+//   .attr("width", w)
+//   .append("g")
+//   .attr("transform", "translate(" + marginBar.left + "," + marginBar.top + ")");
+
+// function getAmountBar(gemeente, query,start_date, end_date, intention) {
+//   counterBar = 0;
+//   ValuesBar = Array();
+//   queries.push(query)
+//   for (var i = 0; i < queries.length; i++) {
+//     getQueryResults(gemeente, queries[i], i,start_date, end_date, intention);
+//   }    
+// }
+
+// function getQueryResults(gemeente, query, valueIndex,start_date, end_date, intention){
+//   if (gemeente == "combined_index"){
+//   	gemeente = "";
+//   } else{
+//   	gemeente += "/"
+//   }
+//   $.post('http://api.openraadsinformatie.nl/v0/'+gemeente+'search', 
+//   	'{"query":"\\"'+query+'\\"","filters":{"collection":{"terms":["aalsmeer","alkmaar","almelo","almere","amersfoort","amstelveen","amsterdam","arnhem","baarn","barneveld","beemster","binnenmaas","bodegravenreeuwijk","borne","boxmeer","buren","cappelleadijssel","castricum", "culemborg","den_helder","denhaag","deventer","dewolden","diemen","doetinchem","dongen","drimmelen","edamvolendam","ede","emmen","enschede","epe","ettenleur","goirle","gouda","groningen","hardenberg","heemskerk","heerde","hendrikidoambacht","hilvarenbeek","hilversum","hollandskroon","hulst","katwijk","krimpenadijssel","krimpenerwaard","landsmeer","leeuwarden","leiden","leiderdorp","leusden","lingewaard","loonopzand","losser","maassluis","maastricht","medemblik","meierijstad","meppel","moerdijk","molenwaard","nieuwegein","nieuwkoop","nijkerk","noordoostpolder","noordwijk","noordwijkerhout","oisterwijk","oldambt","ommen","oosterhout","oostgelre","oss","oude_ijsselstreek","overbetuwe","raalte","rheden","rhenen","rijswijk","roermond","roosendaal","rucphen","schagen","schiedam","soest","staphorst","steenbergen","steenwijkerland","stichtsevecht","texel","teylingen","utrecht","veenendaal","velsen","vlaardingen","vlissingen","voorschoten","voorst","waalwijk","wageningen","wassenaar","zaanstad","zandvoort","zeist","zoetermeer","zwartewaterland","zwolle"]}, "start_date":{"from": "'+start_date+'","to":"'+end_date+'"}}}')
+//   .done(function(data){
+//     ValuesBar[valueIndex] = {y: query,x:data.meta.total};
+//     var dataset = ValuesBar
+//     counterBar ++;
+//     if(counterBar == queries.length){
+//       if(intention == "update"){
+//         chartGroup.selectAll("*").remove()
+//       }
+//       if(true){
+//         var yScaleBar = d3.scale.linear()
+//           .domain([0, d3.max(dataset, function (d) {
+//             return d.x
+//           })])
+//           .range([heightBar, 0]);
+
+//         var xScaleBar = d3.scale.ordinal()
+//           .domain(dataset.map(function (d) {
+//               return d.y
+//           }))
+//           .rangeBands([0, widthBar]);
+
+//         var linearColorScale = d3.scale.linear()
+//           .domain([0, dataset.length])
+//           .range(["#572500", "#F68026"]);
+
+//         var ordinalColorScale = d3.scale.category20();
+
+//         var xAxisBar = d3.svg.axis()
+//           .scale(xScaleBar)
+//           .orient("bottom");
+
+//         var yAxisBar = d3.svg.axis()
+//           .scale(yScaleBar)
+//           .orient("left");
+
+//         if(gemeente == ""){
+// 	    	gemeenteNaam = "alle gemeentes"
+// 	    }
+// 	    else{
+// 	    	gemeenteNaam = gemeente.slice(0,-1)
+// 	    }
+
+//         chartGroup.append("text")
+// 			.attr("class", "title")
+// 		    .attr("x", 0)             
+// 		    .attr("y", -30)
+// 		    .attr("text-anchor", "left")  
+// 		    .style("font-size", "16px") 
+// 		    .style("text-decoration", "underline")  
+// 		    .text("Staafdiagram: Hoeveelheid documenten uit " + gemeenteNaam +" waarin onderstaande termen voorkwamen tussen "+ $("#start_date").val()+" en " +$("#end_date").val()+ ".");
+
+//         function drawAxis(params) {
+//           if (params.initialize === true) {
+//             //Draw X Axis
+//             this.append("g")
+//               .classed("x axis", true)
+//               .attr("transform", "translate(" + 0 + " , " + heightBar + ")")
+//               .call(params.axis.x)
+//               .selectAll("text")
+//               .classed("x-axis-label", true)
+//               .style("text-anchor", "end")
+//               .attr("dx", -8)
+//               .attr("dy", 8)
+//               .attr("transform", "translate(0, 0) rotate(-20)");
+
+//             //Draw Y Axis
+//             this.append("g")
+//               .classed("y axis", true)
+//               .attr("transform", "translate(" + 0 + "," + 0 + ")")
+//               .call(params.axis.y);
+
+//             //Draw Y Label
+//             this.select(".y.axis")
+//               .append("text")
+//               .attr("x", 0)
+//               .attr("y", 0)
+//               .style("text-anchor", "middle")
+//               .attr("transform", "translate(-70," + heightBar / 2 + ") rotate(-90)")
+//               .text("Voorgekomen");
+
+//             //Draw X Label
+//             this.select(".x.axis")
+//               .append("text")
+//               .attr("x", 0)
+//               .attr("y", 0)
+//               .style("text-anchor", "middle")
+//               .attr("transform", "translate(" + widthBar / 2 + ", 130)")
+//               .text("term");
+
+//           } else if (params.initialize === false) {
+//             this.selectAll("g.x.axis")
+//               .transition()
+//               .duration(500)
+//               .call(params.axis.x);
+
+//             this.selectAll(".x-axis-label")
+//               .style("text-anchor", "end")
+//               .attr("dx", -8)
+//               .attr("dy", 8)
+//               .attr("transform", "translate(0, 0) rotate(-20)");
+
+//             this.selectAll("g.y.axis")
+//               .transition()
+//               .duration(500)
+//               .call(params.axis.y);
+//           }
+//         }
+        
+//         function plot(params) {
+//           yScaleBar.domain([0, d3.max(params.data, function (d) {
+//             return d.x
+//           })]);
+//           xScaleBar.domain(params.data.map(function (d) {
+//             return d.y
+//           }));
+
+//           drawAxis.call(this, params);
+
+//           //Enter Phase
+//           this.selectAll(".bar")
+//             .data(params.data)
+//             .enter()
+//             .append("rect")
+//             .classed("bar", true)
+//             .on("mouseover", function (d, i) {
+//               d3.select(this).style("fill", "yellow")
+//             })
+//             .on("mouseout", function (d, i) {
+//               d3.select(this).style("fill", ordinalColorScale(d.y));
+//             })
+//             .on('click', function(d) {
+// 			    var options = {filters:{collection:{terms:["aalsmeer","alkmaar","almelo","almere","amersfoort","amstelveen","amsterdam","arnhem","baarn","barneveld","beemster","binnenmaas","bodegravenreeuwijk","borne","boxmeer","buren","cappelleadijssel","castricum", "culemborg","den_helder","denhaag","deventer","dewolden","diemen","doetinchem","dongen","drimmelen","edamvolendam","ede","emmen","enschede","epe","ettenleur","goirle","gouda","groningen","hardenberg","heemskerk","heerde","hendrikidoambacht","hilvarenbeek","hilversum","hollandskroon","hulst","katwijk","krimpenadijssel","krimpenerwaard","landsmeer","leeuwarden","leiden","leiderdorp","leusden","lingewaard","loonopzand","losser","maassluis","maastricht","medemblik","meierijstad","meppel","moerdijk","molenwaard","nieuwegein","nieuwkoop","nijkerk","noordoostpolder","noordwijk","noordwijkerhout","oisterwijk","oldambt","ommen","oosterhout","oostgelre","oss","oude_ijsselstreek","overbetuwe","raalte","rheden","rhenen","rijswijk","roermond","roosendaal","rucphen","schagen","schiedam","soest","staphorst","steenbergen","steenwijkerland","stichtsevecht","texel","teylingen","utrecht","veenendaal","velsen","vlaardingen","vlissingen","voorschoten","voorst","waalwijk","wageningen","wassenaar","zaanstad","zandvoort","zeist","zoetermeer","zwartewaterland","zwolle"]},types:{terms:["events","motions","vote_events"]},classification:{terms:["Agendapunt","Agenda","Ingekomen stukken","Toezeggingen","Moties","Schriftelijke vragen","Raadsbrieven","Verslag","Commissiebrieven S&R", "Toezeggingen S&R","Amendementen","Besluitenlijst B&W","Toezeggingen M&S","Commissiebrieven M&S","Raadsvragen","Schriftelijke vragen (export)","Gemeentebladen","Schriftelijke Vragen","Toezeggingen Raad","Uitnodigingen","RSS","Voortganglijst/toezeggingen" ,"Brieven aan de raad","Informatie","Informatieve Stukken College","Stemmingen","Persberichten","Raadsverslagen","Artikel 44 vragen","Informatie van het college","Verslagen S&R","Collegebrieven","Aangeleverde raadsvoorstellen","Aanbevelingen onderzoeken","Brieven B&W aan raad","Besluitenlijsten raad","Griffie-info documenten","Besluitenlijsten college van B&W","Technische vragen","Besluitenlijst Raad","Rapport","Raadsmededelingen & Memo's","Memo's","Informatienota's","Memo actieve raadsinformatie","Overige raadsinformatie","B&W besluiten","Vragen aan het college","Weekmail","Standpuntenlijsten commissie(s)","Artikel 45 vragen","Artikel 32 vragen","Vragen","Besluitenlijsten (B&W)","Genomen raadsbesluiten","Raadsvragen en antwoorden","College besluitenlijsten","Beantwoorde raadsvragen","Report","Besluitenlijsten college","Verslagen M&S","Dossiers","Notulen raad","Besluitenlijsten van de raad","Vastgesteld beleid","Rekenkamerrapporten","Schriftelijke vragen (artikel 41 RvO)","Besluitenlijsten","Verslag B&W","Vergaderstukken gemeenschappelijke regelingen", "Collegevoorstellen (ter informatie)","Raadsvragen Schriftelijke","Verslagen Raad","export","Brieven aan de raad – Openbaar","Besluitenlijst","Collegeberichten","agendapunt_actielijst","Besluitenlijst raad","Raadsbesluiten","Besluitenlijst PS","Politieke vragen","Videotulen Commissie Stad en Ruimte","Openbare besluitenlijsten college","Notulen","Raadsinformatie","Videotulen Raadsvergadering ","Schriftelijke vragen art. 18","Besluitenlijsten B&W","Verslagen Vragenuur","Griffie-info","Schriftelijke vragen art. 41","Sjabloonvragen","Verslag Raad","Videotulen Commissie Mens en Samenleving","Raadsjournaal","Besluitenlijsten Raad","Mondelinge Vragen","Videotulen Gemeenteraad","Resolution"]},start_date:{from:start_date+"T00:00:01.000Z",to:end_date+ "T22:59:59.000Z"}}, facets:{start_date:{interval:"year"}},sort:"start_date",order:"desc"}
+// 			    options = window.LZString.compressToBase64(JSON.stringify(options)).split('/').join('-')
+
+// 			    if (gemeente != "alle gemeentes") {
+// 				    window.open(
+// 				    	'http://zoek.openraadsinformatie.nl/#/g/'+$("#gemeente1").val()+'/search/' +d.y+'/options/'+options,
+// 				    	'_blank' // <- This is what makes it open in a new window.
+// 			    	);
+// 			    }
+// 			    else{
+// 			    	 window.open(
+// 				    	'http://zoek.openraadsinformatie.nl/#/search/"' +d.y+'"	/options/'+options,
+// 				    	'_blank' // <- This is what makes it open in a new window.
+// 			    	);
+// 			    }
+// 			});;
+
+//           this.selectAll(".bar-label")
+//             .data(dataset)
+//             .enter()
+//             .append("text")
+//             .classed("bar-label", true);
+
+//           // Update Phase
+//           this.selectAll(".bar")
+//             .transition()
+//             .duration(500)
+//             .ease("bounce")
+//             .delay(function (d, i) {
+//               return i * 50
+//             })
+//             .attr("x", function (d, i) {
+//               return xScaleBar(d.y)
+//             })
+//             .attr("y", function (d, i) {
+//               return yScaleBar(d.x)
+//             })
+//             .attr("width", function (d, i) {
+//               return xScaleBar.rangeBand()
+//             })
+//             .attr("height", function (d, i) {
+//               return heightBar - yScaleBar(d.x)
+//             })
+//             .style("fill", function (d, i) {
+//               return ordinalColorScale(d.y)
+//             });
+
+//           this.selectAll(".bar-label")
+//             .transition()
+//             .duration(500)
+//             .ease("bounce")
+//             .delay(function (d, i) {
+//               return i * 50
+//             })
+//             .attr("x", function (d, i) {
+//               return xScaleBar(d.y) + xScaleBar.rangeBand() / 2
+//             })
+//             .attr("y", function (d, i) {
+//               return yScaleBar(d.x) - 20
+//             })
+//             .attr("dy", 15)
+//             .text(function (d, i) {
+//               return d.x
+//             })
+//             .style("fill", "black")
+//             .style("text-anchor", "middle");
+
+//           //Exit Phase
+//           this.selectAll(".bar")
+//             .data(params.data)
+//             .exit()
+//             .remove();
+
+//           this.selectAll(".bar-label")
+//             .data(params.data)
+//             .exit()
+//             .remove();
+//         }
+
+
+
+        // plot.call(chartGroup, {
+        //   data: dataset,
+        //   axis: {
+        //     x: xAxisBar//             y: yAxisBar
+        //   },
+        //   initialize: true
+        // });
+
+      //   sort_btn.on("click", function () {
+      //   var self = d3.select(this);
+      //   var state = +self.attr("state");
+      //   var ascending = function (a, b) {
+      //     return a.x - b.x
+      //   }
+      //   var descending = function (a, b) {
+      //     return b.x - a.x
+      //   }
+      //   var txt = "Sorteer ";
+      //   if (state === 0) {
+      //     dataset.sort(ascending);
+      //     state = 1;
+      //     txt += "aflopend";
+      //   } else if (state === 1) {
+      //     dataset.sort(descending);
+      //     state = 0;
+      //     txt += "oplopend";
+      //   }
+      //   self.attr("state", state);
+      //   self.html(txt);
+      //   plot.call(chartGroup, {
+      //     data: dataset,
+      //     axis: {
+      //       x: xAxisBar,
+      //       y: yAxisBar
+      //     },
+      //     // gridline: yGridLinesBar,
+      //     initialize: false
+      //   });
+      // });
+//   }}}
+// )}
+
+// $("#klikhiermannetje").click(function(){getAmountBar($("#gemeente1").val(), $("#query").val(),$("#start_date").val(), $("#end_date").val(), "update");});
+
+</script>
+<script src="bar chart.js"></script>
+<div class="footer">
+  <p>VNG Realisatie</p>
+</div>
+    </body>
+</html>
